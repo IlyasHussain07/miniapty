@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-in-production}
+      DATABASE_URL: /app/data/mini-apty.db
+      PORT: 3000
+    volumes:
+      - db-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  db-data:

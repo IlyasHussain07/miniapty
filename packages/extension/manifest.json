@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Mini Apty",
+  "version": "1.0.0",
+  "description": "Record and replay interactive walkthroughs on any website.",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "sidePanel",
+    "scripting"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Mini Apty"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["*.js", "*.css", "*.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
