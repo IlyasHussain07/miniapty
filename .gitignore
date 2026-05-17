@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+extension/node_modules/
+backend/node_modules/
+
+# Environment files
+.env
+.env.example
+extension/.env
+extension/.env.example
+backend/.env
+backend/.env.example
+
+# Build output
+dist/
+extension/dist/
