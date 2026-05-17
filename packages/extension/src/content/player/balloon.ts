@@ -14,7 +14,7 @@ const BALLOON_STYLES = `
     width: 300px;
     font-size: 14px;
     color: #1a202c;
-    z-index: 2147483647;
+    z-index: 2147483645;
     pointer-events: all;
     animation: mapty-in 0.15s ease-out;
   }
@@ -202,17 +202,20 @@ export class BalloonPlayer {
 
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    requestAnimationFrame(() => {
-      const r = target.getBoundingClientRect();
-      const pad = 5;
-      Object.assign(this.ringEl.style, {
-        display: 'block',
-        top: `${r.top - pad}px`,
-        left: `${r.left - pad}px`,
-        width: `${r.width + pad * 2}px`,
-        height: `${r.height + pad * 2}px`,
+    // Wait for smooth scroll to complete before positioning the ring
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const r = target.getBoundingClientRect();
+        const pad = 5;
+        Object.assign(this.ringEl.style, {
+          display: 'block',
+          top: `${r.top - pad}px`,
+          left: `${r.left - pad}px`,
+          width: `${r.width + pad * 2}px`,
+          height: `${r.height + pad * 2}px`,
+        });
       });
-    });
+    }, 400);
   }
 
   private positionBalloon(target: Element | null): void {
@@ -220,6 +223,7 @@ export class BalloonPlayer {
     const vh = window.innerHeight;
     const bw = 300 + 16;
     const bh = 160;
+    const gap = 14;
 
     if (!target) {
       Object.assign(this.balloonEl.style, { top: '20px', left: `${vw / 2 - bw / 2}px` });
@@ -227,19 +231,39 @@ export class BalloonPlayer {
     }
 
     const r = target.getBoundingClientRect();
+    const rightSpace = vw - r.right;
+    const leftSpace = r.left;
     const belowSpace = vh - r.bottom;
     const aboveSpace = r.top;
 
     let top: number;
-    if (belowSpace >= bh + 14) {
-      top = r.bottom + 14;
-    } else if (aboveSpace >= bh + 14) {
-      top = r.top - bh - 14;
-    } else {
+    let left: number;
+
+    // Try to position to the right
+    if (rightSpace >= bw + gap) {
+      left = r.right + gap;
       top = Math.max(10, Math.min(r.top, vh - bh - 10));
     }
-
-    const left = Math.min(Math.max(r.left, 8), vw - bw - 8);
+    // Try to position to the left
+    else if (leftSpace >= bw + gap) {
+      left = r.left - bw - gap;
+      top = Math.max(10, Math.min(r.top, vh - bh - 10));
+    }
+    // Try to position below
+    else if (belowSpace >= bh + gap) {
+      top = r.bottom + gap;
+      left = Math.max(8, Math.min(r.left, vw - bw - 8));
+    }
+    // Try to position above
+    else if (aboveSpace >= bh + gap) {
+      top = r.top - bh - gap;
+      left = Math.max(8, Math.min(r.left, vw - bw - 8));
+    }
+    // Fallback: center on screen
+    else {
+      top = Math.max(10, Math.min(r.top, vh - bh - 10));
+      left = Math.max(8, Math.min(r.left, vw - bw - 8));
+    }
 
     Object.assign(this.balloonEl.style, { top: `${top}px`, left: `${left}px` });
   }
