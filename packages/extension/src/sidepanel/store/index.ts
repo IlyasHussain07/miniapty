@@ -1,15 +1,16 @@
 import { create } from 'zustand';
 import { api, fetchWithCache } from '../api/client';
 import { storage } from '../../shared/storage';
-import type { Walkthrough, Step, ApiError } from '../../shared/types';
+import type { Walkthrough, Step, ApiError, AdminUser } from '../../shared/types';
 
-export type View = 'login' | 'register' | 'list' | 'editor' | 'recording';
+export type View = 'login' | 'register' | 'list' | 'editor' | 'recording' | 'admin';
 
 interface State {
   // Auth
   token: string | null;
   userId: string | null;
   userEmail: string | null;
+  userRole: 'author' | 'user' | null;
   // UI
   view: View;
   error: ApiError | null;
@@ -18,6 +19,7 @@ interface State {
   // Data
   walkthroughs: Walkthrough[];
   currentWalkthrough: Walkthrough | null;
+  users: AdminUser[];
   // Recording
   isRecording: boolean;
   recordingTitle: string;
@@ -45,6 +47,10 @@ interface Actions {
   removePendingStep: (index: number) => void;
   startPlayer: (wt: Walkthrough) => Promise<void>;
   stopPlayer: () => void;
+  loadUsers: () => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  activateUser: (id: string) => Promise<void>;
+  updateUserRole: (id: string, role: 'author' | 'user') => Promise<void>;
   setView: (view: View) => void;
   clearError: () => void;
 }
@@ -53,12 +59,14 @@ export const useStore = create<State & Actions>((set, get) => ({
   token: null,
   userId: null,
   userEmail: null,
+  userRole: null,
   view: 'login',
   error: null,
   isLoading: false,
   offlineMode: false,
   walkthroughs: [],
   currentWalkthrough: null,
+  users: [],
   isRecording: false,
   recordingTitle: '',
   recordingOrigin: '',
@@ -70,7 +78,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   async init() {
     const [token, user] = await Promise.all([storage.getToken(), storage.getUser()]);
     if (token && user) {
-      set({ token, userId: user.id, userEmail: user.email, view: 'list' });
+      set({ token, userId: user.id, userEmail: user.email, userRole: user.role ?? null, view: 'list' });
     } else {
       set({ view: 'login' });
     }
@@ -81,7 +89,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     try {
       const r = await api.login(email, password);
       await Promise.all([storage.setToken(r.token), storage.setUser(r.user)]);
-      set({ token: r.token, userId: r.user.id, userEmail: r.user.email, view: 'list', isLoading: false });
+      set({ token: r.token, userId: r.user.id, userEmail: r.user.email, userRole: r.user.role, view: 'list', isLoading: false });
     } catch (err) {
       set({ error: err as ApiError, isLoading: false });
     }
@@ -92,7 +100,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     try {
       const r = await api.signup(email, password);
       await Promise.all([storage.setToken(r.token), storage.setUser(r.user)]);
-      set({ token: r.token, userId: r.user.id, userEmail: r.user.email, view: 'list', isLoading: false });
+      set({ token: r.token, userId: r.user.id, userEmail: r.user.email, userRole: r.user.role, view: 'list', isLoading: false });
     } catch (err) {
       set({ error: err as ApiError, isLoading: false });
     }
@@ -100,7 +108,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   async logout() {
     await Promise.all([storage.clearToken(), storage.clearUser(), storage.clearPlayerProgress()]);
-    set({ token: null, userId: null, userEmail: null, walkthroughs: [], currentWalkthrough: null, view: 'login', error: null });
+    set({ token: null, userId: null, userEmail: null, userRole: null, walkthroughs: [], currentWalkthrough: null, users: [], view: 'login', error: null });
   },
 
   async loadWalkthroughs(origin) {
@@ -201,6 +209,63 @@ export const useStore = create<State & Actions>((set, get) => ({
   stopPlayer() {
     chrome.runtime.sendMessage({ type: 'STOP_PLAYER' }).catch(() => {});
     storage.clearPlayerProgress().catch(() => {});
+  },
+
+  async loadUsers() {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      const users = await api.listUsers(token);
+      set({ users, isLoading: false });
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async deleteUser(id: string) {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      await api.deleteUser(id, token);
+      set(s => ({
+        users: s.users.filter(u => u.id !== id),
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async activateUser(id: string) {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await api.activateUser(id, token);
+      set(s => ({
+        users: s.users.map(u => u.id === id ? updated : u),
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async updateUserRole(id: string, role: 'author' | 'user') {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await api.updateUserRole(id, role, token);
+      set(s => ({
+        users: s.users.map(u => u.id === id ? updated : u),
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
   },
 
   setView: view => set({ view }),

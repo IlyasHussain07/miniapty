@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import { authRoutes } from './routes/auth';
 import { walkthroughRoutes } from './routes/walkthroughs';
+import { adminRoutes } from './routes/admin';
+import { initDb } from './db/index';
 
 export function buildApp(opts: { logger?: boolean } = {}) {
   const app = Fastify({ logger: opts.logger ?? true });
@@ -29,6 +31,11 @@ export function buildApp(opts: { logger?: boolean } = {}) {
 
   app.register(authRoutes);
   app.register(walkthroughRoutes);
+  app.register(adminRoutes);
+
+  app.addHook('onReady', async () => {
+    await initDb();
+  });
 
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 

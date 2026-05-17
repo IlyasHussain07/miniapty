@@ -3,6 +3,7 @@ import type { Walkthrough, PlayerProgress } from './types';
 export interface StoredUser {
   id: string;
   email: string;
+  role: 'author' | 'user';
 }
 
 async function get<T>(key: string): Promise<T | null> {

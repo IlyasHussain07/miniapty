@@ -1,6 +1,16 @@
 export interface User {
   id: string;
   email: string;
+  role: 'author' | 'user';
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: 'author' | 'user';
+  isActive: boolean;
   createdAt: Date;
 }
 
@@ -44,5 +54,6 @@ export interface Walkthrough {
 export interface JwtPayload {
   userId: string;
   email: string;
+  role: 'author' | 'user';
 }
 

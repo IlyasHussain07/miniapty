@@ -18,9 +18,9 @@ export async function createUser(email: string, password: string): Promise<User>
   const now = new Date();
   const id = uuidv4();
 
-  db.insert(users).values({ id, email, passwordHash, createdAt: now }).run();
+  db.insert(users).values({ id, email, passwordHash, role: 'user', isActive: true, createdAt: now }).run();
 
-  return { id, email, createdAt: now };
+  return { id, email, role: 'user', isActive: true, createdAt: now };
 }
 
 export async function verifyCredentials(email: string, password: string): Promise<User> {
@@ -35,5 +35,9 @@ export async function verifyCredentials(email: string, password: string): Promis
     throw Object.assign(new Error('Invalid credentials'), { code: 'INVALID_CREDENTIALS' });
   }
 
-  return { id: row.id, email: row.email, createdAt: row.createdAt as Date };
+  if (!row.isActive) {
+    throw Object.assign(new Error('Account is disabled'), { code: 'ACCOUNT_DISABLED' });
+  }
+
+  return { id: row.id, email: row.email, role: row.role, isActive: row.isActive, createdAt: row.createdAt };
 }

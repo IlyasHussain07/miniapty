@@ -5,6 +5,7 @@ import { LoginForm } from './components/Auth/LoginForm';
 import { RegisterForm } from './components/Auth/RegisterForm';
 import { WalkthroughList } from './components/WalkthroughList/index';
 import { WalkthroughEditor } from './components/WalkthroughEditor/index';
+import { UserManagement } from './components/UserManagement/index';
 import type { Step } from '../shared/types';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -69,10 +70,49 @@ function ErrorBanner() {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 function Header() {
-  const { userEmail, logout } = useStore();
+  const { userEmail, userRole, view, setView, logout } = useStore();
+  const showList = view === 'list' || view === 'recording';
+  const isOnWalkthroughs = showList || view === 'editor';
+
   return (
-    <header style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+    <header style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: 8 }}>
       <span style={{ fontWeight: 800, fontSize: 15, color: '#2563eb', letterSpacing: '-0.01em' }}>Mini Apty</span>
+      {userEmail && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+          <button
+            onClick={() => setView('list')}
+            style={{
+              fontSize: 12,
+              color: isOnWalkthroughs ? '#2563eb' : '#718096',
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              padding: 0,
+              transition: 'color 0.12s',
+            }}
+          >
+            Walkthroughs
+          </button>
+          {userRole === 'author' && (
+            <button
+              onClick={() => setView('admin')}
+              style={{
+                fontSize: 12,
+                color: view === 'admin' ? '#2563eb' : '#718096',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                padding: 0,
+                transition: 'color 0.12s',
+              }}
+            >
+              Users
+            </button>
+          )}
+        </div>
+      )}
       {userEmail && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: '#718096', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</span>
@@ -121,6 +161,7 @@ export function App() {
           {view === 'register' && <RegisterForm />}
           {showList            && <WalkthroughList />}
           {view === 'editor'   && <WalkthroughEditor />}
+          {view === 'admin'    && <UserManagement />}
         </div>
       </div>
     </ErrorBoundary>

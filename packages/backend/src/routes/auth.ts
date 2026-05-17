@@ -19,8 +19,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const user = await createUser(result.data.email, result.data.password);
-      const token = app.jwt.sign({ userId: user.id, email: user.email });
-      return reply.status(201).send({ token, user: { id: user.id, email: user.email } });
+      const token = app.jwt.sign({ userId: user.id, email: user.email, role: user.role });
+      return reply.status(201).send({ token, user: { id: user.id, email: user.email, role: user.role } });
     } catch (err: unknown) {
       if ((err as { code?: string }).code === 'EMAIL_TAKEN') {
         return reply.status(409).send({ error: 'Conflict', message: 'Email already in use' });
@@ -40,11 +40,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const user = await verifyCredentials(result.data.email, result.data.password);
-      const token = app.jwt.sign({ userId: user.id, email: user.email });
-      return reply.send({ token, user: { id: user.id, email: user.email } });
+      const token = app.jwt.sign({ userId: user.id, email: user.email, role: user.role });
+      return reply.send({ token, user: { id: user.id, email: user.email, role: user.role } });
     } catch (err: unknown) {
       if ((err as { code?: string }).code === 'INVALID_CREDENTIALS') {
         return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid credentials' });
+      }
+      if ((err as { code?: string }).code === 'ACCOUNT_DISABLED') {
+        return reply.status(403).send({ error: 'Forbidden', message: 'Account is disabled' });
       }
       throw err;
     }

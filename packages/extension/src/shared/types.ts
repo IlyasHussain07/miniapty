@@ -41,6 +41,14 @@ export interface PlayerProgress {
   url: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: 'author' | 'user';
+  isActive: boolean;
+  createdAt: string;
+}
+
 export type ApiErrorType = 'network' | 'auth' | 'forbidden' | 'validation' | 'unknown';
 
 export interface ApiError {

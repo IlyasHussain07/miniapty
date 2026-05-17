@@ -1,4 +1,4 @@
-import type { Walkthrough, Step, ApiError } from '../../shared/types';
+import type { Walkthrough, Step, ApiError, AdminUser } from '../../shared/types';
 import { storage } from '../../shared/storage';
 
 const BASE = 'http://localhost:3000';
@@ -30,7 +30,7 @@ async function req<T>(path: string, init: RequestInit = {}, token?: string): Pro
 
 export interface AuthResult {
   token: string;
-  user: { id: string; email: string };
+  user: { id: string; email: string; role: 'author' | 'user' };
 }
 
 export const api = {
@@ -59,6 +59,18 @@ export const api = {
 
   deleteWalkthrough: (id: string, token: string) =>
     req<void>(`/walkthroughs/${id}`, { method: 'DELETE' }, token),
+
+  listUsers: (token: string) =>
+    req<AdminUser[]>('/admin/users', {}, token),
+
+  updateUserRole: (id: string, role: 'author' | 'user', token: string) =>
+    req<AdminUser>(`/admin/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }, token),
+
+  deleteUser: (id: string, token: string) =>
+    req<void>(`/admin/users/${id}`, { method: 'DELETE' }, token),
+
+  activateUser: (id: string, token: string) =>
+    req<AdminUser>(`/admin/users/${id}/activate`, { method: 'PATCH', body: JSON.stringify({}) }, token),
 };
 
 export async function fetchWithCache(
