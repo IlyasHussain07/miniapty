@@ -1,0 +1,9 @@
+{
+  "name": "mini-apty",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "build:extension": "pnpm --filter extension build",
+    "test:backend": "pnpm --filter backend test"
+  }
+}
