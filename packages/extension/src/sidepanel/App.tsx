@@ -126,14 +126,17 @@ function Header() {
 // ── Root App ──────────────────────────────────────────────────────────────────
 
 export function App() {
-  const { view, init, addPendingStep, stopRecording, stopPlayer } = useStore();
+  const { view, init, addPendingStep, stopRecording, stopPlayer, handleTabUpdated } = useStore();
 
   useEffect(() => { init(); }, [init]);
 
-  const onMessage = useCallback((msg: { type: string; step?: Step }) => {
+  const onMessage = useCallback((msg: { type: string; step?: Step; url?: string }) => {
     switch (msg.type) {
       case 'STEP_CAPTURED':
         if (msg.step) addPendingStep(msg.step);
+        break;
+      case 'TAB_UPDATED':
+        if (msg.url) handleTabUpdated(msg.url);
         break;
       // RECORDING_STOPPED means the picker was cancelled (Esc), NOT that the whole
       // recording session ended. RecordingPanel handles its own picking state locally.
@@ -142,7 +145,7 @@ export function App() {
         stopPlayer();
         break;
     }
-  }, [addPendingStep, stopPlayer]);
+  }, [addPendingStep, stopPlayer, handleTabUpdated]);
 
   useEffect(() => {
     chrome.runtime.onMessage.addListener(onMessage);

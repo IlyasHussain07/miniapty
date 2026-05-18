@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getDb } from '../db/index';
-import { walkthroughs } from '../db/schema';
+import { walkthroughs, walkthroughAssignments } from '../db/schema';
 import type { Walkthrough, Step } from '../types';
 
 type WalkthroughRow = typeof walkthroughs.$inferSelect;
@@ -22,9 +22,34 @@ function rowToWalkthrough(row: WalkthroughRow): Walkthrough {
 export function listWalkthroughs(
   userId: string,
   origin: string,
-  pathPattern?: string
+  pathPattern?: string,
+  role?: 'author' | 'user'
 ): Walkthrough[] {
   const db = getDb();
+
+  if (role === 'user') {
+    // Users see walkthroughs assigned to them
+    const assignedIds = db
+      .select({ walkthroughId: walkthroughAssignments.walkthroughId })
+      .from(walkthroughAssignments)
+      .where(eq(walkthroughAssignments.assigneeId, userId))
+      .all()
+      .map(r => r.walkthroughId);
+
+    if (assignedIds.length === 0) return [];
+
+    const conditions = [inArray(walkthroughs.id, assignedIds), eq(walkthroughs.origin, origin)];
+    if (pathPattern) conditions.push(eq(walkthroughs.pathPattern, pathPattern));
+
+    return db
+      .select()
+      .from(walkthroughs)
+      .where(and(...conditions))
+      .all()
+      .map(rowToWalkthrough);
+  }
+
+  // Authors (default) see their own walkthroughs
   const conditions = [eq(walkthroughs.userId, userId), eq(walkthroughs.origin, origin)];
   if (pathPattern) conditions.push(eq(walkthroughs.pathPattern, pathPattern));
 
@@ -91,4 +116,53 @@ export function deleteWalkthrough(id: string, userId: string): void {
   if (existing.userId !== userId) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
 
   db.delete(walkthroughs).where(eq(walkthroughs.id, id)).run();
+}
+
+export function getAssignees(walkthroughId: string): string[] {
+  const db = getDb();
+  return db
+    .select({ assigneeId: walkthroughAssignments.assigneeId })
+    .from(walkthroughAssignments)
+    .where(eq(walkthroughAssignments.walkthroughId, walkthroughId))
+    .all()
+    .map(r => r.assigneeId);
+}
+
+export function assignWalkthrough(walkthroughId: string, userIds: string[], authorId: string): string[] {
+  const db = getDb();
+  const existing = getWalkthrough(walkthroughId);
+  if (!existing) throw Object.assign(new Error('Not found'), { code: 'NOT_FOUND' });
+  if (existing.userId !== authorId) throw Object.assign(new Error('Forbidden'), { code: 'FORBIDDEN' });
+
+  // Delete existing assignments
+  db.delete(walkthroughAssignments).where(eq(walkthroughAssignments.walkthroughId, walkthroughId)).run();
+
+  // Insert new assignments
+  const now = new Date();
+  for (const userId of userIds) {
+    db.insert(walkthroughAssignments)
+      .values({ id: uuidv4(), walkthroughId, assigneeId: userId, createdAt: now })
+      .run();
+  }
+
+  return userIds;
+}
+
+export function getAssignedWalkthroughs(userId: string): Walkthrough[] {
+  const db = getDb();
+  const assignedIds = db
+    .select({ walkthroughId: walkthroughAssignments.walkthroughId })
+    .from(walkthroughAssignments)
+    .where(eq(walkthroughAssignments.assigneeId, userId))
+    .all()
+    .map(r => r.walkthroughId);
+
+  if (assignedIds.length === 0) return [];
+
+  return db
+    .select()
+    .from(walkthroughs)
+    .where(inArray(walkthroughs.id, assignedIds))
+    .all()
+    .map(rowToWalkthrough);
 }

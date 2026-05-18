@@ -8,12 +8,15 @@ export function WalkthroughList() {
   const {
     view, walkthroughs, loadWalkthroughs, deleteWalkthrough,
     setCurrentWalkthrough, setView, startRecording, startPlayer, offlineMode, isLoading,
+    userRole, users, loadUsers, assignWalkthrough,
   } = useStore();
 
   const [currentOrigin, setCurrentOrigin] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newPath, setNewPath] = useState('/');
+  const [assigningWtId, setAssigningWtId] = useState<string | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -52,9 +55,11 @@ export function WalkthroughList() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 15, fontWeight: 800, color: '#1a202c' }}>Walkthroughs</h2>
-        <button onClick={() => setShowNewForm(v => !v)} style={btnOutline}>
-          {showNewForm ? 'Cancel' : '+ New'}
-        </button>
+        {userRole === 'author' && (
+          <button onClick={() => setShowNewForm(v => !v)} style={btnOutline}>
+            {showNewForm ? 'Cancel' : '+ New'}
+          </button>
+        )}
       </div>
 
       {showNewForm && (
@@ -80,20 +85,83 @@ export function WalkthroughList() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: showNewForm ? 10 : 0 }}>
         {walkthroughs.map(wt => (
-          <div key={wt.id} style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontWeight: 700, fontSize: 14, color: '#1a202c', marginBottom: 3 }}>{wt.title}</p>
-                <p style={{ fontSize: 12, color: '#718096' }}>
-                  {wt.pathPattern} &middot; {wt.steps.length} step{wt.steps.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                <button onClick={() => startPlayer(wt)} title="Preview" style={btnIconBlue}>▶</button>
-                <button onClick={() => handleEdit(wt)} title="Edit" style={btnIcon}>✎</button>
-                <button onClick={() => { if (confirm(`Delete "${wt.title}"?`)) deleteWalkthrough(wt.id); }} title="Delete" style={{ ...btnIcon, color: '#e53e3e' }}>×</button>
+          <div key={wt.id}>
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontWeight: 700, fontSize: 14, color: '#1a202c', marginBottom: 3 }}>{wt.title}</p>
+                  <p style={{ fontSize: 12, color: '#718096' }}>
+                    {wt.pathPattern} &middot; {wt.steps.length} step{wt.steps.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                  <button onClick={() => startPlayer(wt)} title="Preview" style={btnIconBlue}>▶</button>
+                  {userRole === 'author' && (
+                    <>
+                      <button onClick={() => handleEdit(wt)} title="Edit" style={btnIcon}>✎</button>
+                      <button onClick={() => { if (confirm(`Delete "${wt.title}"?`)) deleteWalkthrough(wt.id); }} title="Delete" style={{ ...btnIcon, color: '#e53e3e' }}>×</button>
+                      <button
+                        onClick={async () => {
+                          if (assigningWtId === wt.id) {
+                            setAssigningWtId(null);
+                          } else {
+                            if (users.length === 0) await loadUsers();
+                            setAssigningWtId(wt.id);
+                            setSelectedUserIds(new Set(wt.assignedTo ?? []));
+                          }
+                        }}
+                        title="Assign"
+                        style={{ ...btnIcon, ...(assigningWtId === wt.id ? { background: '#fef3c7', color: '#d97706' } : {}) }}
+                      >
+                        👥
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
+
+            {assigningWtId === wt.id && userRole === 'author' && (
+              <div style={{ ...card, marginTop: -8, paddingTop: 12, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0, background: '#fafafa' }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#4a5568', marginBottom: 10 }}>Assign to users:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                  {users.map(u => (
+                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#2d3748', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.has(u.id)}
+                        onChange={e => {
+                          const next = new Set(selectedUserIds);
+                          if (e.target.checked) next.add(u.id);
+                          else next.delete(u.id);
+                          setSelectedUserIds(next);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>{u.email}</span>
+                      {!u.isActive && <span style={{ fontSize: 11, color: '#a0aec0' }}>(inactive)</span>}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={async () => {
+                      await assignWalkthrough(wt.id, Array.from(selectedUserIds));
+                      setAssigningWtId(null);
+                    }}
+                    style={{ ...btnPrimary, flex: 1, padding: '7px' }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setAssigningWtId(null)}
+                    style={{ ...btnOutline, flex: 1, padding: '7px' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -130,7 +198,9 @@ function RecordingPanel({ origin }: { origin: string }) {
           <h2 style={{ fontSize: 14, fontWeight: 800, color: '#1a202c' }}>Recording</h2>
           <p style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{recordingTitle} &middot; {recordingPath}</p>
         </div>
-        <button onClick={stopRecording} style={{ ...btnIcon, color: '#e53e3e', fontSize: 13 }}>✕ Stop</button>
+        {pickerState === 'active' && (
+          <button onClick={() => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' }).catch(() => {})} style={{ ...btnIcon, color: '#ea580c', fontSize: 13 }}>⏸ Pause</button>
+        )}
       </div>
 
       {pickerState === 'unavailable' && (
@@ -172,10 +242,15 @@ function RecordingPanel({ origin }: { origin: string }) {
         ))}
       </div>
 
-      {pendingSteps.length > 0 && (
-        <button onClick={saveWalkthrough} disabled={isLoading} style={{ ...btnPrimary, width: '100%', marginTop: 14 }}>
-          {isLoading ? 'Saving…' : `Save Walkthrough (${pendingSteps.length} step${pendingSteps.length !== 1 ? 's' : ''})`}
-        </button>
+      {pendingSteps.length > 0 && pickerState === 'paused' && (
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={saveWalkthrough} disabled={isLoading} style={{ ...btnPrimary, flex: 1 }}>
+            {isLoading ? 'Saving…' : `Save Walkthrough (${pendingSteps.length} step${pendingSteps.length !== 1 ? 's' : ''})`}
+          </button>
+          <button onClick={() => { stopRecording(); }} style={{ ...btnOutline, flex: 1, color: '#e53e3e' }}>
+            Discard
+          </button>
+        </div>
       )}
     </div>
   );

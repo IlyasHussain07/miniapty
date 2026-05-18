@@ -20,6 +20,7 @@ interface State {
   walkthroughs: Walkthrough[];
   currentWalkthrough: Walkthrough | null;
   users: AdminUser[];
+  assignedWalkthroughs: Walkthrough[];
   // Recording
   isRecording: boolean;
   recordingTitle: string;
@@ -51,6 +52,9 @@ interface Actions {
   deleteUser: (id: string) => Promise<void>;
   activateUser: (id: string) => Promise<void>;
   updateUserRole: (id: string, role: 'author' | 'user') => Promise<void>;
+  assignWalkthrough: (walkthroughId: string, userIds: string[]) => Promise<void>;
+  loadAssignedWalkthroughs: () => Promise<void>;
+  handleTabUpdated: (url: string) => Promise<void>;
   setView: (view: View) => void;
   clearError: () => void;
 }
@@ -67,6 +71,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   walkthroughs: [],
   currentWalkthrough: null,
   users: [],
+  assignedWalkthroughs: [],
   isRecording: false,
   recordingTitle: '',
   recordingOrigin: '',
@@ -79,6 +84,9 @@ export const useStore = create<State & Actions>((set, get) => ({
     const [token, user] = await Promise.all([storage.getToken(), storage.getUser()]);
     if (token && user) {
       set({ token, userId: user.id, userEmail: user.email, userRole: user.role ?? null, view: 'list' });
+      if (user.role === 'user') {
+        await get().loadAssignedWalkthroughs();
+      }
     } else {
       set({ view: 'login' });
     }
@@ -108,7 +116,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   async logout() {
     await Promise.all([storage.clearToken(), storage.clearUser(), storage.clearPlayerProgress()]);
-    set({ token: null, userId: null, userEmail: null, userRole: null, walkthroughs: [], currentWalkthrough: null, users: [], view: 'login', error: null });
+    set({ token: null, userId: null, userEmail: null, userRole: null, walkthroughs: [], currentWalkthrough: null, users: [], assignedWalkthroughs: [], view: 'login', error: null });
   },
 
   async loadWalkthroughs(origin) {
@@ -265,6 +273,58 @@ export const useStore = create<State & Actions>((set, get) => ({
       }));
     } catch (err) {
       set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async assignWalkthrough(walkthroughId, userIds) {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await api.assignWalkthrough(walkthroughId, userIds, token);
+      set(s => ({
+        walkthroughs: s.walkthroughs.map(w => w.id === walkthroughId ? updated : w),
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async loadAssignedWalkthroughs() {
+    const { token } = get();
+    if (!token) return;
+    set({ isLoading: true, error: null });
+    try {
+      const assignedWalkthroughs = await api.listAssignedWalkthroughs(token);
+      set({ assignedWalkthroughs, isLoading: false });
+    } catch (err) {
+      set({ error: err as ApiError, isLoading: false });
+    }
+  },
+
+  async handleTabUpdated(url) {
+    const { assignedWalkthroughs, isRecording } = get();
+    if (isRecording) return;
+
+    try {
+      const parsed = new URL(url);
+      const origin = parsed.origin;
+      const path = parsed.pathname;
+
+      const match = assignedWalkthroughs.find(wt =>
+        wt.origin === origin && (wt.pathPattern === '*' || path.startsWith(wt.pathPattern))
+      );
+
+      if (match) {
+        const played = await storage.getPlayedWalkthroughs();
+        if (!played.includes(match.id)) {
+          await get().startPlayer(match);
+          await storage.addPlayedWalkthrough(match.id);
+        }
+      }
+    } catch (err) {
+      // Silently fail on invalid URL or other errors
     }
   },
 

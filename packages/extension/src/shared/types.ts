@@ -33,6 +33,7 @@ export interface Walkthrough {
   steps: Step[];
   createdAt: string;
   updatedAt: string;
+  assignedTo?: string[];
 }
 
 export interface PlayerProgress {

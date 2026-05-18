@@ -50,8 +50,19 @@ function getInstance(): { db: DB; sqlite: InstanceType<typeof Database> } {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS walkthrough_assignments (
+      id TEXT PRIMARY KEY,
+      walkthrough_id TEXT NOT NULL REFERENCES walkthroughs(id) ON DELETE CASCADE,
+      assignee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      UNIQUE(walkthrough_id, assignee_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_wt_user_origin
       ON walkthroughs(user_id, origin);
+
+    CREATE INDEX IF NOT EXISTS idx_wa_assignee
+      ON walkthrough_assignments(assignee_id);
   `);
 
   // Migration: add role and is_active columns to existing databases

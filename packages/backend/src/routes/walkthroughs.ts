@@ -8,6 +8,9 @@ import {
   createWalkthrough,
   updateWalkthrough,
   deleteWalkthrough,
+  getAssignees,
+  assignWalkthrough,
+  getAssignedWalkthroughs,
 } from '../services/walkthroughService';
 
 const stepSchema = z.object({
@@ -40,21 +43,34 @@ const createSchema = z.object({
 });
 
 const updateSchema = createSchema.partial().omit({ origin: true });
+const assignSchema = z.object({
+  userIds: z.array(z.string().uuid()),
+});
 
 export async function walkthroughRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/walkthroughs', { preHandler: authenticate }, async (request, reply) => {
+  app.get('/walkthroughs/assigned', { preHandler: authenticate }, async (request, reply) => {
     const { userId } = request.user as JwtPayload;
+    return reply.send(getAssignedWalkthroughs(userId));
+  });
+
+  app.get('/walkthroughs', { preHandler: authenticate }, async (request, reply) => {
+    const { userId, role } = request.user as JwtPayload;
     const { origin, path } = request.query as { origin?: string; path?: string };
 
     if (!origin) {
       return reply.status(400).send({ error: 'Validation', message: 'origin query param is required' });
     }
 
-    return reply.send(listWalkthroughs(userId, origin, path));
+    return reply.send(listWalkthroughs(userId, origin, path, role));
   });
 
   app.post('/walkthroughs', { preHandler: authenticate }, async (request, reply) => {
-    const { userId } = request.user as JwtPayload;
+    const { userId, role } = request.user as JwtPayload;
+
+    if (role !== 'author') {
+      return reply.status(403).send({ error: 'Forbidden', message: 'Only authors can create walkthroughs' });
+    }
+
     const result = createSchema.safeParse(request.body);
     if (!result.success) {
       return reply.status(400).send({
@@ -73,7 +89,14 @@ export async function walkthroughRoutes(app: FastifyInstance): Promise<void> {
 
     const wt = getWalkthrough(id);
     if (!wt) return reply.status(404).send({ error: 'NotFound', message: 'Walkthrough not found' });
-    if (wt.userId !== userId) return reply.status(403).send({ error: 'Forbidden', message: 'Access denied' });
+
+    // Allow access if owner or assigned to user
+    if (wt.userId !== userId) {
+      const assignees = getAssignees(id);
+      if (!assignees.includes(userId)) {
+        return reply.status(403).send({ error: 'Forbidden', message: 'Access denied' });
+      }
+    }
 
     return reply.send(wt);
   });
@@ -114,4 +137,38 @@ export async function walkthroughRoutes(app: FastifyInstance): Promise<void> {
       throw err;
     }
   });
+
+  app.put<{ Params: { id: string }; Body: { userIds: string[] } }>(
+    '/walkthroughs/:id/assignments',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const { userId, role } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+
+      if (role !== 'author') {
+        return reply.status(403).send({ error: 'Forbidden', message: 'Only authors can assign walkthroughs' });
+      }
+
+      const validation = assignSchema.safeParse(request.body);
+      if (!validation.success) {
+        return reply.status(400).send({
+          error: 'Validation',
+          message: validation.error.issues.map(i => i.message).join(', '),
+        });
+      }
+
+      try {
+        assignWalkthrough(id, validation.data.userIds, userId);
+        const wt = getWalkthrough(id);
+        if (!wt) return reply.status(404).send({ error: 'NotFound' });
+
+        return reply.send({ ...wt, assignedTo: validation.data.userIds });
+      } catch (err: unknown) {
+        const code = (err as { code?: string }).code;
+        if (code === 'NOT_FOUND') return reply.status(404).send({ error: 'NotFound' });
+        if (code === 'FORBIDDEN') return reply.status(403).send({ error: 'Forbidden', message: 'Access denied' });
+        throw err;
+      }
+    }
+  );
 }

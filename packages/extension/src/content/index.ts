@@ -90,6 +90,7 @@ if (g.__miniAptyInjected) {
 
   function stopRecording(): void {
     if (cancelPicker) { cancelPicker(); cancelPicker = null; }
+    send({ type: 'RECORDING_STOPPED' });
   }
 
   // ── Player ───────────────────────────────────────────────────────────────────

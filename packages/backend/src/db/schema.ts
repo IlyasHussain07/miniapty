@@ -21,3 +21,14 @@ export const walkthroughs = sqliteTable('walkthroughs', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const walkthroughAssignments = sqliteTable('walkthrough_assignments', {
+  id: text('id').primaryKey(),
+  walkthroughId: text('walkthrough_id')
+    .notNull()
+    .references(() => walkthroughs.id, { onDelete: 'cascade' }),
+  assigneeId: text('assignee_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});

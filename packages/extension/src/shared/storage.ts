@@ -37,4 +37,16 @@ export const storage = {
   getPlayerProgress: () => get<PlayerProgress>('player_progress'),
   setPlayerProgress: (p: PlayerProgress) => set('player_progress', p),
   clearPlayerProgress: () => remove('player_progress'),
+
+  getPlayedWalkthroughs: async () => {
+    const played = await get<string[]>('played_walkthroughs');
+    return played ?? [];
+  },
+  addPlayedWalkthrough: async (id: string) => {
+    const existing = await get<string[]>('played_walkthroughs');
+    const played = existing ?? [];
+    if (!played.includes(id)) {
+      await set('played_walkthroughs', [...played, id]);
+    }
+  },
 };

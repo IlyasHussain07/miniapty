@@ -71,6 +71,12 @@ export const api = {
 
   activateUser: (id: string, token: string) =>
     req<AdminUser>(`/admin/users/${id}/activate`, { method: 'PATCH', body: JSON.stringify({}) }, token),
+
+  assignWalkthrough: (id: string, userIds: string[], token: string) =>
+    req<Walkthrough>(`/walkthroughs/${id}/assignments`, { method: 'PUT', body: JSON.stringify({ userIds }) }, token),
+
+  listAssignedWalkthroughs: (token: string) =>
+    req<Walkthrough[]>('/walkthroughs/assigned', {}, token),
 };
 
 export async function fetchWithCache(
