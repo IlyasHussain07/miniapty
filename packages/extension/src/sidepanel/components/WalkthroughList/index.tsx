@@ -188,7 +188,7 @@ function RecordingPanel({ origin }: { origin: string }) {
 
   function resume() {
     setPickerState('active');
-    chrome.runtime.sendMessage({ type: 'START_RECORDING' }).catch(() => {});
+    chrome.runtime.sendMessage({ type: 'START_RECORDING' }).catch(() => { });
   }
 
   return (
@@ -199,7 +199,7 @@ function RecordingPanel({ origin }: { origin: string }) {
           <p style={{ fontSize: 11, color: '#718096', marginTop: 2 }}>{recordingTitle} &middot; {recordingPath}</p>
         </div>
         {pickerState === 'active' && (
-          <button onClick={() => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' }).catch(() => {})} style={{ ...btnIcon, color: '#ea580c', fontSize: 13 }}>⏸ Pause</button>
+          <button onClick={() => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' }).catch(() => { })} style={{ ...btnIcon, color: '#ea580c', fontSize: 13 }}>⏸ Pause</button>
         )}
       </div>
 

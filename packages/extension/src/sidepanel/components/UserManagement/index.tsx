@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useStore } from '../../store/index';
-import type { AdminUser } from '../../../shared/types';
 
 const styles = {
   container: {
